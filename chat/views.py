@@ -42,7 +42,9 @@ def fulfillmentResponse(outputContexts, intent, parameters, queryText):
     pokemon = (parameters['pokes'].lower().replace('.', '-').replace(' ', '').replace("'", '') 
                 if 'pokes' in parameters 
                 else '')
-    specs = parameters['objects']
+    specs = ''
+    if 'objects' in parameters:
+      specs = parameters['objects']
     get_type_effectiveness = 'type_effectiveness' in parameters
 
     fulfillmentText = ''
@@ -72,6 +74,7 @@ def fulfillmentResponse(outputContexts, intent, parameters, queryText):
       data = pokeapi('pokemon-species', pokemon)
 
       evolution_chain_id = data['evolution_chain']['url'].split('/')[6]
+      print(f'\nevolution_chain_id: {evolution_chain_id}\n')
       flavor_text = list(filter(lambda item: item['language']['name'] == 'en', data['flavor_text_entries']))[0]['flavor_text'].replace('\x0c', ' ')
 
       if (specs == 'description'):
@@ -79,23 +82,29 @@ def fulfillmentResponse(outputContexts, intent, parameters, queryText):
       
       if (intent['displayName'] == 'evolution'):
         data = pokeapi('evolution-chain', evolution_chain_id)
+        print(f'\n data about evolution chain: {data}\n')
         evolution_requirement = parameters['evolution']
 
-        pokemon_evolutions = list(data['chain']['species']['name'])
+        pokemon = pokemon.capitalize()
+        pokemon_evolutions = [data['chain']['species']['name'].capitalize()]
         response['fulfillmentText'] = f'{pokemon} has no evolution chain'
 
         # if pokemon has further evolutions
-        if (data['chain']['evolves_to']):
-          pokemon_evolutions.append(data['chain']['evolves_to'][0]['evovles_to'][0]['species']['name'])
+        chain = data['chain']
+        while (chain['evolves_to']):
+          pokemon_evolutions.append(chain['evolves_to'][0]['species']['name'].capitalize())
+          chain = chain['evolves_to'][0]
         
         evolution_chain = ' -> '.join(pokemon_evolutions)
-        order_in_evolution_chain = pokemon_evolutions.indexOf(pokemon)
+        print(f'\n**** these are the pokemon evolutions: {evolution_chain}\n')
+        order_in_evolution_chain = pokemon_evolutions.index(pokemon)
         next_form = pokemon_evolutions[order_in_evolution_chain + 1]
         previous_form = pokemon_evolutions[order_in_evolution_chain - 1]
 
         evolution_text = {
             'evolution_chain': f'{pokemon}\'s evolution chain is: {evolution_chain}',
             'first_evolution': 'This is already the first form' if (pokemon == pokemon_evolutions[0]) else f'{pokemon_evolutions[0]} is the first evolution',
+            'second_evolution': 'This is already the second form' if (pokemon == pokemon_evolutions[1]) else f'{pokemon_evolutions[1]} is the second evolution',
             'last_evolution': 'This is already the final form' if (pokemon == pokemon_evolutions[-1]) else f'{pokemon_evolutions[-1]} is the last evolution',
             'next_form': f'{pokemon} evolves to {next_form}',
             'previous_form': f'{pokemon} evolves from {previous_form}'
